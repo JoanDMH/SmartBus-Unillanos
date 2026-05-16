@@ -1,0 +1,6 @@
+memory.md
+walkthrough.md
+02_mvp_specification.md
+frontend/node_modules/
+__pycache__/
+*.pyc
