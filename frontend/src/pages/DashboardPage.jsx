@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getRoutes, getTripStats } from '../api/tripApi';
+import { getRoutes, getTripStats, getDemandAnalysis } from '../api/tripApi';
 
 /* ─── Inline SVG Icons ─── */
 const IconBus = () => (
@@ -61,6 +61,13 @@ const IconRoute = () => (
   </svg>
 );
 
+const IconSparkles = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+    <path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/>
+  </svg>
+);
+
 export default function DashboardPage() {
   const { token, user, logout } = useAuth();
   const navigate = useNavigate();
@@ -68,6 +75,11 @@ export default function DashboardPage() {
   const [routes, setRoutes] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // AI analysis state
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -90,6 +102,20 @@ export default function DashboardPage() {
   const handleLogout = () => {
     logout();
     navigate('/login', { replace: true });
+  };
+
+  const handleAiAnalysis = async () => {
+    setAiLoading(true);
+    setAiError('');
+    setAiAnalysis(null);
+    try {
+      const data = await getDemandAnalysis(token);
+      setAiAnalysis(data.analysis);
+    } catch (err) {
+      setAiError(err.message);
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const userInitial = user ? user.charAt(0).toUpperCase() : '?';
@@ -153,6 +179,55 @@ export default function DashboardPage() {
               <div className="stat-value">{stats?.busiest_hour ?? '—'}</div>
               <div className="stat-label">Hora pico</div>
             </div>
+          </div>
+
+          {/* AI Analysis Section */}
+          <div className="section-header animate-in">
+            <div className="section-header-icon ai-icon"><IconSparkles /></div>
+            <span className="section-header-text">Análisis Inteligente</span>
+          </div>
+
+          <div className="ai-card card animate-in">
+            <div className="ai-card-header">
+              <div className="ai-card-badge">
+                <IconSparkles />
+                <span>IA · Groq</span>
+              </div>
+              <p className="ai-card-desc">
+                Análisis de patrones de demanda generado por inteligencia artificial
+                a partir de los viajes registrados en la base de datos.
+              </p>
+            </div>
+
+            {aiAnalysis && (
+              <div className="ai-card-content">
+                <p className="ai-card-text">{aiAnalysis}</p>
+              </div>
+            )}
+
+            {aiError && (
+              <div className="alert alert-error" style={{ marginTop: '1rem' }}>
+                {aiError}
+              </div>
+            )}
+
+            <button
+              className="btn btn-ai"
+              onClick={handleAiAnalysis}
+              disabled={aiLoading}
+            >
+              {aiLoading ? (
+                <>
+                  <span className="spinner" />
+                  Analizando…
+                </>
+              ) : (
+                <>
+                  <span className="btn-icon"><IconSparkles /></span>
+                  {aiAnalysis ? 'Generar nuevo análisis' : 'Generar análisis de demanda'}
+                </>
+              )}
+            </button>
           </div>
 
           {/* Route Cards */}

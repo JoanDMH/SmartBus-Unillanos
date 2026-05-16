@@ -1,5 +1,5 @@
-//const TRIP_BASE = 'http://localhost:8000';
-const TRIP_BASE = '';
+// Uses env var in production builds, falls back to empty for local dev (Vite proxy)
+const TRIP_BASE = import.meta.env.VITE_TRIP_LOG_BASE_URL || '';
 
 function authHeaders(token) {
   return {
@@ -57,5 +57,20 @@ export async function getTripStats(token) {
     headers: authHeaders(token),
   });
   if (!res.ok) throw new Error('Error al obtener estadísticas');
+  return res.json();
+}
+
+/**
+ * GET /trips/ai/demand-analysis — protected.
+ * Returns { analysis: string } with AI-generated demand insights.
+ */
+export async function getDemandAnalysis(token) {
+  const res = await fetch(`${TRIP_BASE}/trips/ai/demand-analysis`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || 'Error al obtener análisis de IA');
+  }
   return res.json();
 }

@@ -1,5 +1,5 @@
-// Relative URL — Vite proxy forwards /api to MiniIdentity (localhost:5000)
-const AUTH_BASE = '/api';
+// Uses env var in production builds, falls back to /api for local dev (Vite proxy)
+const AUTH_BASE = import.meta.env.VITE_AUTH_BASE_URL || '/api';
 
 /**
  * Login via MiniIdentity API.

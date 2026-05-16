@@ -10,40 +10,86 @@ Make sure the following tools are installed before starting:
 
 | Tool | Minimum version | Verify installation |
 |---|---|---|
-| **.NET SDK** | 10.0 | `dotnet --version` |
-| **Python** | 3.11 | `python --version` |
-| **Node.js** | 18.0 | `node --version` |
-| **npm** | 9.0 | `npm --version` |
+| **Docker** | 24.0 | `docker --version` |
+| **Docker Compose** | 2.20 | `docker compose version` |
+| **.NET SDK** (optional, for local dev) | 10.0 | `dotnet --version` |
+| **Python** (optional, for local dev) | 3.11 | `python --version` |
+| **Node.js** (optional, for local dev) | 18.0 | `node --version` |
 
 ---
 
 ## Project structure
 
 ```
-MVP/
+SmartBus-Unillanos/
 ├── mini-identity-api-dotnet/   ← Authentication API (.NET 10)
-├── trip-log-service/           ← Trip logging microservice (Python · FastAPI)
-├── frontend/                   ← Web application (React + Vite)
+├── trip-log-service/           ← Trip logging microservice (Python · FastAPI · PostgreSQL)
+│   ├── storage/database.py     ← PostgreSQL async layer (SQLAlchemy + asyncpg)
+│   ├── services/ai_analysis.py ← AI demand analysis (Groq API)
+│   └── ...
+├── frontend/                   ← Web application (React + Vite → Nginx)
+│   ├── nginx.conf              ← Reverse proxy config
+│   └── ...
+├── docker-compose.yml          ← Full environment orchestration
+├── Dockerfile.auth             ← MiniIdentity container build
 ├── 01_project_context.md       ← Full project context
 └── README.md                   ← This file
 ```
 
 ---
 
-## Running locally
+## Running with Docker (recommended)
+
+### 1. Set up environment
+
+Create a `.env` file in the project root:
+
+```env
+GROQ_API_KEY=gsk_YOUR_GROQ_API_KEY_HERE
+```
+
+### 2. Start all services
+
+```powershell
+docker compose up --build
+```
+
+This starts four containers:
+- **PostgreSQL** on port `5432`
+- **MiniIdentity Auth API** on port `5000`
+- **trip-log-service** on port `8000`
+- **Frontend (Nginx)** on port `80`
+
+Wait for all services to report healthy status.
+
+### 3. Register a user (required once per database reset)
+
+```powershell
+$body = '{"username":"testuser","email":"test@unillanos.edu.co","password":"Test123!"}'
+Invoke-RestMethod -Uri "http://localhost:5000/api/auth/register" -Method Post -ContentType "application/json" -Body $body
+```
+
+### 4. Access the application
+
+Open your browser at **http://localhost**
+
+---
+
+## Running locally (development)
 
 Three terminals are required, one for each service. Start them in the order shown below.
+
+### Terminal 0 — PostgreSQL (Docker)
+
+```powershell
+docker run -d --name smartbus-db -e POSTGRES_USER=smartbus -e POSTGRES_PASSWORD=smartbus123 -e POSTGRES_DB=smartbus -p 5432:5432 postgres:15-alpine
+```
 
 ### Terminal 1 — Authentication API (port 5000)
 
 ```powershell
 cd mini-identity-api-dotnet\src\MiniIdentityApi.Api
 dotnet run --urls "http://localhost:5000"
-```
-
-Wait for:
-```
-Now listening on: http://localhost:5000
 ```
 
 ### Terminal 2 — Trip log microservice (port 8000)
@@ -63,11 +109,6 @@ cd trip-log-service
 uvicorn main:app --reload --port 8000
 ```
 
-Wait for:
-```
-Application startup complete.
-```
-
 ### Terminal 3 — Frontend (port 5173)
 
 First time (install dependencies):
@@ -82,36 +123,13 @@ cd frontend
 npm run dev
 ```
 
-Wait for:
-```
-Local:   http://localhost:5173/
-```
-
----
-
-## User registration (required once per restart)
-
-Both MiniIdentity and trip-log-service use in-memory storage, so **all data is lost when the service restarts**. You must register at least one user each time you start MiniIdentity.
-
-Open a fourth terminal or use PowerShell:
-
-```powershell
-$body = '{"username":"testuser","email":"test@unillanos.edu.co","password":"Test123!"}'
-Invoke-RestMethod -Uri "http://localhost:5000/api/auth/register" -Method Post -ContentType "application/json" -Body $body
-```
-
-Expected response:
-```
-message
--------
-User registered successfully.
-```
+Open **http://localhost:5173**
 
 ---
 
 ## Using the application
 
-1. Open your browser at **http://localhost:5173**
+1. Open your browser at **http://localhost** (Docker) or **http://localhost:5173** (dev)
 2. Log in with the registered credentials:
    - **Username:** `testuser`
    - **Password:** `Test123!`
@@ -119,47 +137,20 @@ User registered successfully.
 4. Click **Registrar Viaje** to register a trip with occupancy data and ML context variables
 5. Click **Historial** to view all registered trips
 6. Use **Descargar CSV** to export trip data
+7. Click **Generar análisis de demanda** for AI-powered demand insights
 
 ---
 
-## LAN access from another device
+## AI Demand Analysis
 
-To access the system from another computer on the same network:
+The system includes an AI-powered demand analysis feature:
 
-### On the host machine
+- **Endpoint:** `GET /trips/ai/demand-analysis` (protected)
+- **Provider:** Groq Cloud (llama3-8b-8192 model)
+- **Function:** Analyzes recorded trip data and generates Spanish-language recommendations about demand patterns, peak hours, and frequency optimization
+- **Frontend:** Available in the Dashboard under "Análisis Inteligente"
 
-1. Find your local IP address:
-   ```powershell
-   ipconfig
-   ```
-   Note the **IPv4 Address** (e.g. `192.168.1.50`)
-
-2. Start all services listening on all network interfaces:
-   ```powershell
-   # Terminal 1 — Auth
-   dotnet run --urls "http://0.0.0.0:5000"
-
-   # Terminal 2 — trip-log-service
-   uvicorn main:app --reload --host 0.0.0.0 --port 8000
-
-   # Terminal 3 — Frontend
-   npm run dev -- --host
-   ```
-
-### On the other device
-
-Open a browser and navigate to:
-```
-http://192.168.1.50:5173
-```
-(replace with your actual IP)
-
-> **Note:** If Windows Firewall blocks the connection, run as Administrator:
-> ```powershell
-> netsh advfirewall firewall add rule name="SmartBus Auth" dir=in action=allow protocol=tcp localport=5000
-> netsh advfirewall firewall add rule name="SmartBus Trips" dir=in action=allow protocol=tcp localport=8000
-> netsh advfirewall firewall add rule name="SmartBus Frontend" dir=in action=allow protocol=tcp localport=5173
-> ```
+Requires `GROQ_API_KEY` environment variable.
 
 ---
 
@@ -167,9 +158,10 @@ http://192.168.1.50:5173
 
 | Service | Port | Technology | API documentation |
 |---|---|---|---|
+| PostgreSQL | `5432` | PostgreSQL 15 | — |
 | MiniIdentity API | `5000` | .NET 10 / ASP.NET Core | `http://localhost:5000/swagger` |
 | trip-log-service | `8000` | Python / FastAPI | `http://localhost:8000/docs` |
-| Frontend | `5173` | React / Vite | — |
+| Frontend | `80` (Docker) / `5173` (dev) | React / Vite / Nginx | — |
 
 ---
 
@@ -182,6 +174,8 @@ JWT_SECRET=THIS_IS_A_DEMO_KEY_CHANGE_IT_123456789
 JWT_ISSUER=MiniIdentityApi
 JWT_AUDIENCE=MiniIdentityApiUsers
 PORT=8000
+DATABASE_URL=postgresql+asyncpg://smartbus:smartbus123@localhost:5432/smartbus
+GROQ_API_KEY=gsk_YOUR_GROQ_API_KEY_HERE
 ```
 
 These values must match the JWT configuration in MiniIdentity's `appsettings.json`.
@@ -190,8 +184,9 @@ These values must match the JWT configuration in MiniIdentity's `appsettings.jso
 
 ## Important notes
 
-- **In-memory storage:** Both MiniIdentity and trip-log-service store data in memory. All data is lost when either service restarts.
-- **Startup order:** Start MiniIdentity (port 5000) first, then trip-log-service (port 8000), and finally the frontend (port 5173).
-- **CORS:** The frontend uses Vite's dev server proxy to avoid CORS issues with MiniIdentity. No additional CORS configuration is needed.
-- **Shared JWT secret:** The backend services do not communicate with each other. Both validate JWT tokens independently using the same shared secret key.
+- **Persistent storage:** Trip data is stored in PostgreSQL and survives container restarts. The `postgres_data` Docker volume ensures data persistence.
+- **Startup order:** Docker Compose handles service ordering automatically. For local dev: start PostgreSQL first, then MiniIdentity, trip-log-service, and finally the frontend.
+- **CORS:** In Docker, Nginx acts as a reverse proxy, serving all services from the same origin (no CORS issues). In dev mode, Vite's proxy handles this.
+- **Shared JWT secret:** Backend services validate JWT tokens independently using the same shared secret key.
 - **JWT claims:** MiniIdentity puts the user UUID in the `sub` claim and the username in `unique_name`. The trip-log-service reads `unique_name` for the `registered_by` field.
+- **MiniIdentity in-memory:** MiniIdentity still uses in-memory storage for users. Register a user each time the auth container restarts.

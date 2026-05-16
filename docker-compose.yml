@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: smartbus
+      POSTGRES_PASSWORD: smartbus123
+      POSTGRES_DB: smartbus
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartbus"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  auth:
+    build:
+      context: .
+      dockerfile: Dockerfile.auth
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_URLS=http://+:5000
+
+  trip-log:
+    build: ./trip-log-service
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://smartbus:smartbus123@postgres:5432/smartbus
+      - JWT_SECRET=THIS_IS_A_DEMO_KEY_CHANGE_IT_123456789
+      - JWT_ISSUER=MiniIdentityApi
+      - JWT_AUDIENCE=MiniIdentityApiUsers
+      - GROQ_API_KEY=${GROQ_API_KEY}
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - auth
+      - trip-log
+
+volumes:
+  postgres_data:

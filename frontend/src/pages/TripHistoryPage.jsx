@@ -85,7 +85,6 @@ export default function TripHistoryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    y
     getTrips(token)
       .then(setTrips)
       .catch(() => { })
