@@ -146,7 +146,7 @@ Open **http://localhost:5173**
 The system includes an AI-powered demand analysis feature:
 
 - **Endpoint:** `GET /trips/ai/demand-analysis` (protected)
-- **Provider:** Groq Cloud (llama3-8b-8192 model)
+- **Provider:** Groq Cloud (llama-3.1-8b-instant model)
 - **Function:** Analyzes recorded trip data and generates Spanish-language recommendations about demand patterns, peak hours, and frequency optimization
 - **Frontend:** Available in the Dashboard under "Análisis Inteligente"
 

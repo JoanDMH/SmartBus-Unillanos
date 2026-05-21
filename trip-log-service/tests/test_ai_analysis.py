@@ -57,7 +57,7 @@ async def test_analyze_demand_success():
         assert "Authorization" in kwargs["headers"]
         
         payload = kwargs["json"]
-        assert payload["model"] == "llama3-8b-8192"
+        assert payload["model"] == "llama-3.1-8b-instant"
         assert len(payload["messages"]) == 2
         assert payload["messages"][0]["role"] == "system"
         assert "transporte universitario" in payload["messages"][0]["content"]

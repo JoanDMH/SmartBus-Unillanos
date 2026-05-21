@@ -68,6 +68,8 @@ async def demand_analysis(
     and returns a natural-language analysis in Spanish.
     """
     trips = await get_all_trips(session)
+    # Limit to the 30 most recent trips to avoid payload size and token rate limits on free Groq keys
+    trips = trips[:30]
 
     if not trips:
         raise HTTPException(

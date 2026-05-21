@@ -1,8 +1,3 @@
-# ── Project docs (local only) ──
-memory.md
-walkthrough.md
-02_mvp_specification.md
-
 # ── Python ──
 __pycache__/
 *.pyc
