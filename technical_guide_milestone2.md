@@ -132,7 +132,6 @@ services:
       - JWT_AUDIENCE=MiniIdentityApiUsers
       - GROQ_API_KEY=${GROQ_API_KEY}
 
-Note: My temporary API_KEY for Groq is "agregar apy key"
 
   frontend:
     build: ./frontend
