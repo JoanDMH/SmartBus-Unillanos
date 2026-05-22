@@ -33,7 +33,7 @@ jobs:
           output_location: "dist" # Built app content directory - optional
           ###### End of Repository/Build Configurations ######
         env:
-          VITE_AUTH_BASE_URL: "https://smartbus-auth.nicepebble-7ac167f5.centralus.azurecontainerapps.io"
+          VITE_AUTH_BASE_URL: "https://smartbus-auth.nicepebble-7ac167f5.centralus.azurecontainerapps.io/api"
           VITE_TRIP_LOG_BASE_URL: "https://smartbus-trips.nicepebble-7ac167f5.centralus.azurecontainerapps.io"
 
   close_pull_request_job:
