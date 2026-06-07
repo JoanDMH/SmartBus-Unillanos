@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth.jwt_validator import get_current_user
 from models.trip import TripCreate, TripResponse
 from services.ai_analysis import analyze_demand
+from services.weather_client import get_current_weather
 from storage.database import (
     compute_stats,
     get_all_trips,
@@ -26,14 +27,25 @@ async def create_trip(
     user: str = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """Register a new trip record."""
+    """Register a new trip record.
+
+    If ``weather`` is omitted in the request body, the current weather for
+    Villavicencio is fetched automatically from OpenWeatherMap (DEV-A3).
+    """
+    # Auto-capture weather when not provided by the driver
+    weather_value: str
+    if body.weather is not None:
+        weather_value = body.weather.value
+    else:
+        weather_value = await get_current_weather()
+
     trip = {
         "id": str(uuid.uuid4()),
         "route_id": body.route_id,
         "departure_time": body.departure_time,
         "passenger_count": body.passenger_count,
         "bus_id": body.bus_id,
-        "weather": body.weather.value,
+        "weather": weather_value,
         "academic_week": body.academic_week,
         "special_event": body.special_event,
         "notes": body.notes,

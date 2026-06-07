@@ -9,7 +9,6 @@ venv/
 node_modules/
 dist/
 
-# ── Environment files (contain secrets) ──
 .env
 *.env
 !.env.example
@@ -23,3 +22,6 @@ dist/
 # ── OS ──
 Thumbs.db
 .DS_Store
+
+# ── Credenciales / Secretos locales ──
+azure_deployment_summary.md

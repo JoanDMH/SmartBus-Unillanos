@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { loginUser } from '../api/authApi';
 
@@ -97,6 +97,13 @@ export default function LoginPage() {
         >
           {loading ? <span className="spinner" /> : 'Iniciar Sesión'}
         </button>
+
+        <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+          ¿No tienes cuenta?{' '}
+          <Link to="/register" style={{ color: 'var(--accent-primary-hover)' }}>
+            Crear cuenta
+          </Link>
+        </p>
       </form>
     </div>
   );

@@ -18,3 +18,12 @@ DATABASE_URL: str = os.getenv(
 
 # Groq API key for AI demand analysis
 GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+
+# OpenWeatherMap — auto-capture weather on trip registration (DEV-A3)
+OPENWEATHER_API_KEY: str = os.getenv("OPENWEATHER_API_KEY", "")
+OPENWEATHER_CITY: str = os.getenv("OPENWEATHER_CITY", "Villavicencio,CO")
+
+# Azure Blob Storage — model artifact storage (DEV-B4)
+AZURE_STORAGE_CONNECTION_STRING: str = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "")
+AZURE_MODEL_CONTAINER: str = os.getenv("AZURE_MODEL_CONTAINER", "smartbus-models")
+MODEL_LOCAL_CACHE_PATH: str = os.getenv("MODEL_LOCAL_CACHE_PATH", "/tmp/smartbus_models")

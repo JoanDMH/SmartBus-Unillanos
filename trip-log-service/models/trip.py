@@ -19,7 +19,7 @@ class TripCreate(BaseModel):
     departure_time: datetime
     passenger_count: int = Field(ge=0, le=100)
     bus_id: str
-    weather: Weather = Weather.SOLEADO
+    weather: Weather | None = None  # None → auto-fetched from OpenWeatherMap (DEV-A3)
     academic_week: int = Field(ge=1, le=18, default=1)
     special_event: bool = False
     notes: str | None = None
