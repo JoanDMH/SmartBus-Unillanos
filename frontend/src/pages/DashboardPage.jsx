@@ -138,6 +138,14 @@ export default function DashboardPage() {
             <span className="btn-icon"><IconList /></span>
             Historial
           </button>
+          <button className="btn btn-secondary" onClick={() => navigate('/predictions')}>
+            <span className="btn-icon"><IconSparkles /></span>
+            Predicciones IA
+          </button>
+          <button className="btn btn-secondary" onClick={() => navigate('/schedule')}>
+            <span className="btn-icon"><IconClock /></span>
+            Horarios
+          </button>
           <button className="btn btn-danger" onClick={handleLogout}>
             <span className="btn-icon"><IconLogout /></span>
             Salir

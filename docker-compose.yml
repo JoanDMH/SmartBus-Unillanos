@@ -37,6 +37,37 @@ services:
       - JWT_ISSUER=MiniIdentityApi
       - JWT_AUDIENCE=MiniIdentityApiUsers
       - GROQ_API_KEY=${GROQ_API_KEY}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - OPENWEATHER_CITY=${OPENWEATHER_CITY:-Villavicencio,CO}
+      - AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING}
+      - AZURE_MODEL_CONTAINER=${AZURE_MODEL_CONTAINER:-smartbus-models}
+      - OPTIMIZATION_SERVICE_URL=http://optimization-service:8001
+
+  optimization-service:
+    build: ./optimization-service
+    ports:
+      - "8001:8001"
+    depends_on:
+      - trip-log
+    environment:
+      - PORT=8001
+
+  ai-engine:
+    build: ./ai-engine
+    # Servicio batch — no expone puerto propio.
+    # Arrancar manualmente: docker compose --profile training run --rm ai-engine python train_prophet.py
+    profiles:
+      - training
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://smartbus:smartbus123@postgres:5432/smartbus
+      - AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING}
+      - AZURE_MODEL_CONTAINER=${AZURE_MODEL_CONTAINER:-smartbus-models}
+      - MLFLOW_TRACKING_URI=./mlruns
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./ai-engine/mlruns:/app/mlruns
 
   frontend:
     build: ./frontend
@@ -45,6 +76,7 @@ services:
     depends_on:
       - auth
       - trip-log
+      - optimization-service
 
 volumes:
   postgres_data:

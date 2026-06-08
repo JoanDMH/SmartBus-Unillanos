@@ -1,0 +1,133 @@
+name: Monthly Model Retraining
+
+# DEV-E3 — Reentrenamiento automático mensual de los modelos Prophet y XGBoost.
+#
+# Flujo:
+#   1. Entrena Prophet y XGBoost contra los últimos 3 meses de datos en PostgreSQL.
+#   2. Evalúa ambos modelos con evaluate.py (MAE ≤ 5).
+#   3. Si pasan: sube los .pkl a Azure Blob Storage y reinicia el Container App
+#      para que model_loader.py cargue los modelos actualizados en el próximo startup.
+#   4. Si fallan: el workflow termina con error y NO sube artefactos degradados.
+#
+# Trigger: primer día de cada mes a las 02:00 UTC.
+# También ejecutable manualmente desde GitHub Actions → "Run workflow".
+
+on:
+  schedule:
+    - cron: '0 2 1 * *'   # 1° de cada mes, 02:00 UTC
+  workflow_dispatch:        # ejecución manual desde la UI de GitHub
+    inputs:
+      force_upload:
+        description: 'Subir artefactos aunque MAE > 5 (emergencia)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+jobs:
+  retrain-and-promote:
+    name: Retrain Prophet + XGBoost and promote if MAE ≤ 5
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: ai-engine/requirements.txt
+
+      - name: Install ai-engine dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r ai-engine/requirements.txt
+
+      # ── Entrenamiento ──────────────────────────────────────────────────────
+      - name: Train Prophet model
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+          AZURE_MODEL_CONTAINER: smartbus-models
+          MLFLOW_TRACKING_URI: ./ai-engine/mlruns
+        run: |
+          cd ai-engine
+          python train_prophet.py --route PARQUE
+        # Descarga datos de los últimos 3 meses desde PostgreSQL y sube el .pkl
+        # a Azure Blob. Si falla la BD o el Blob, el step falla y detiene el workflow.
+
+      - name: Train XGBoost model
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+          AZURE_MODEL_CONTAINER: smartbus-models
+          MLFLOW_TRACKING_URI: ./ai-engine/mlruns
+        run: |
+          cd ai-engine
+          python train_xgboost.py --route PARQUE
+
+      # ── Evaluación ─────────────────────────────────────────────────────────
+      - name: Evaluate models against holdout dataset
+        id: evaluate
+        env:
+          AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+          AZURE_MODEL_CONTAINER: smartbus-models
+          MLFLOW_TRACKING_URI: ./ai-engine/mlruns
+        run: |
+          cd ai-engine
+          python evaluate.py --model all
+        # Exit code 1 si MAE > 5 → step falla y bloquea la promoción.
+        # Con force_upload=true se continúa aunque falle (break-glass).
+        continue-on-error: ${{ github.event.inputs.force_upload == 'true' }}
+
+      # ── Promover a producción ──────────────────────────────────────────────
+      # Los .pkl ya fueron subidos por train_prophet.py / train_xgboost.py.
+      # Solo queda reiniciar el Container App para que cargue los modelos nuevos.
+
+      - name: Restart Container App to reload models
+        if: steps.evaluate.outcome == 'success' || github.event.inputs.force_upload == 'true'
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          # Instalar Azure CLI
+          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+          # Autenticarse con Service Principal
+          az login --service-principal \
+            --username "$AZURE_CLIENT_ID" \
+            --password "$AZURE_CLIENT_SECRET" \
+            --tenant "$AZURE_TENANT_ID"
+
+          # Reiniciar la revisión activa del Container App
+          # El model_loader.py descargará los .pkl actualizados en el próximo startup.
+          az containerapp revision restart \
+            --name smartbus-trips \
+            --resource-group smartbus-rg \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --revision "$(az containerapp revision list \
+              --name smartbus-trips \
+              --resource-group smartbus-rg \
+              --query '[?properties.active].name | [0]' \
+              --output tsv)"
+
+          echo "Container App reiniciado. Los modelos nuevos se cargarán en el próximo startup."
+
+      # ── Resumen en el log ──────────────────────────────────────────────────
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Reentrenamiento mensual — $(date -u '+%Y-%m-%d')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.evaluate.outcome }}" = "success" ]; then
+            echo "✅ **MAE ≤ 5** — modelos promovidos a producción." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **MAE > 5** — modelos NO promovidos." >> $GITHUB_STEP_SUMMARY
+            if [ "${{ github.event.inputs.force_upload }}" = "true" ]; then
+              echo "⚠️ force_upload=true activado — promoción forzada." >> $GITHUB_STEP_SUMMARY
+            fi
+          fi

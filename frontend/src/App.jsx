@@ -5,8 +5,9 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import RegisterTripPage from './pages/RegisterTripPage';
 import TripHistoryPage from './pages/TripHistoryPage';
+import PredictionDashboard from './pages/PredictionDashboard';
+import ScheduleApprovalPage from './pages/ScheduleApprovalPage';
 
-/** Redirects to /login if there is no token in context. */
 function PrivateRoute({ children }) {
   const { token } = useAuth();
   return token ? children : <Navigate to="/login" replace />;
@@ -17,30 +18,11 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
-      <Route
-        path="/dashboard"
-        element={
-          <PrivateRoute>
-            <DashboardPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/trips/new"
-        element={
-          <PrivateRoute>
-            <RegisterTripPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/trips"
-        element={
-          <PrivateRoute>
-            <TripHistoryPage />
-          </PrivateRoute>
-        }
-      />
+      <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+      <Route path="/trips/new" element={<PrivateRoute><RegisterTripPage /></PrivateRoute>} />
+      <Route path="/trips" element={<PrivateRoute><TripHistoryPage /></PrivateRoute>} />
+      <Route path="/predictions" element={<PrivateRoute><PredictionDashboard /></PrivateRoute>} />
+      <Route path="/schedule" element={<PrivateRoute><ScheduleApprovalPage /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
