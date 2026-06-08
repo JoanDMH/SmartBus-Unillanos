@@ -27,3 +27,6 @@ OPENWEATHER_CITY: str = os.getenv("OPENWEATHER_CITY", "Villavicencio,CO")
 AZURE_STORAGE_CONNECTION_STRING: str = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "")
 AZURE_MODEL_CONTAINER: str = os.getenv("AZURE_MODEL_CONTAINER", "smartbus-models")
 MODEL_LOCAL_CACHE_PATH: str = os.getenv("MODEL_LOCAL_CACHE_PATH", "/tmp/smartbus_models")
+
+# Optimization service URL (DEV-C1/C3)
+OPTIMIZATION_SERVICE_URL: str = os.getenv("OPTIMIZATION_SERVICE_URL", "http://localhost:8001")

@@ -4,22 +4,22 @@
 **Curso:** Telemática I  
 **Autores:** Joan David Martínez Hernández, Cristian Mateo Torres Villamil, Brayan David Mosquera Agudelo
 
-> **Estado al 2026-06-07:** DEV-D3, DEV-A3, DEV-B1, DEV-B2, DEV-B3 y DEV-B4 completados en sesión anterior.
+> **Estado al 2026-06-08:** DEV-D3, DEV-A3, DEV-B1, DEV-B2, DEV-B3, DEV-B4, DEV-E1, DEV-A1, DEV-A2 y DEV-C1/C2/C3 completados.
 > Este documento lista únicamente las tareas pendientes.
 
 ---
 
 ## Orden de Prioridad de Ejecución
 
-| Prioridad | ID | Justificación |
-| :---: | :--- | :--- |
-| 1 | DEV-E1 | El workflow de validación CI bloquea cualquier merge con modelo degradado. Debe existir antes de los próximos reentrenamientos. |
-| 2 | DEV-A1 | El scheduler de limpieza nocturna es prerequisito para DEV-E2 y DEV-E3. |
-| 3 | DEV-A2 | Evaluar TimescaleDB antes de que el volumen de datos haga lenta la BD; implementar alternativa si no está disponible. |
-| 4 | DEV-C1 → DEV-C3 | Motor de optimización: depende de predicciones confiables (DEV-B4 ya operativo). |
-| 5 | DEV-D1 | Dashboard con Recharts cobra sentido cuando hay predicciones que mostrar. |
-| 6 | DEV-D2 | Human-in-the-loop depende de que el optimizador (DEV-C) genere horarios. |
-| 7 | DEV-E2, DEV-E3 | MLOps de sostenibilidad: drift detection y reentrenamiento automático. |
+| Prioridad | ID | Estado | Justificación |
+| :---: | :--- | :---: | :--- |
+| 1 | DEV-E1 | ✅ | Workflow CI/CD de validación ML completado. |
+| 2 | DEV-A1 | ✅ | APScheduler integrado en lifespan de FastAPI. |
+| 3 | DEV-A2 | ✅ | Índices y vista materializada SQL creados. |
+| 4 | DEV-C1 → DEV-C3 | ✅ | optimization-service (PuLP) + router + tabla schedules. |
+| 5 | DEV-D1 | ⏳ | Dashboard Recharts — siguiente tarea. |
+| 6 | DEV-D2 | ⏳ | ScheduleApprovalPage — depende DEV-C3 (ya completo). |
+| 7 | DEV-E2, DEV-E3 | ⏳ | MLOps: drift KS + reentrenamiento mensual. |
 
 ---
 

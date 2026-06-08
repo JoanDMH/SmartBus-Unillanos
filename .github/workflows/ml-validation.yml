@@ -1,0 +1,116 @@
+name: ML Model Validation
+
+# Ejecuta en cada PR a Develop y en cada push directo a Develop.
+# Descarga los artefactos .pkl desde Azure Blob, los evalúa contra
+# holdout_dataset.csv y bloquea el merge si MAE > 5 pasajeros.
+#
+# Si no existen artefactos todavía (pipeline de entrenamiento aún no
+# ejecutado), el job termina con éxito informando que no hay modelos.
+
+on:
+  pull_request:
+    branches: [Develop]
+    paths:
+      # Solo dispara cuando cambia código relevante para ML
+      - 'ai-engine/**'
+      - 'trip-log-service/services/model_loader.py'
+      - 'trip-log-service/routers/predict_router.py'
+  push:
+    branches: [Develop]
+    paths:
+      - 'ai-engine/**'
+
+jobs:
+  validate-ml-model:
+    name: Validate ML artifacts (MAE ≤ 5)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: ai-engine/requirements.txt
+
+      - name: Install ai-engine dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r ai-engine/requirements.txt
+
+      - name: Download model artifacts from Azure Blob
+        id: download_models
+        env:
+          AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+          AZURE_MODEL_CONTAINER: smartbus-models
+        run: |
+          mkdir -p /tmp/smartbus_models
+          python - <<'EOF'
+          import os, sys
+          conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "")
+          if not conn_str:
+              print("::warning::AZURE_STORAGE_CONNECTION_STRING no configurada — omitiendo descarga de modelos.")
+              sys.exit(0)
+          try:
+              from azure.storage.blob import BlobServiceClient
+              client = BlobServiceClient.from_connection_string(conn_str)
+              container = client.get_container_client(os.getenv("AZURE_MODEL_CONTAINER", "smartbus-models"))
+              blobs = [b.name for b in container.list_blobs() if b.name.endswith(".pkl")]
+              if not blobs:
+                  print("::notice::No se encontraron artefactos .pkl en Azure Blob. Saltando validación.")
+                  # Escribir flag para el siguiente step
+                  with open("/tmp/no_models", "w") as f:
+                      f.write("1")
+                  sys.exit(0)
+              for blob_name in blobs:
+                  local = f"/tmp/smartbus_models/{blob_name}"
+                  with open(local, "wb") as f:
+                      f.write(container.download_blob(blob_name).readall())
+                  print(f"Descargado: {blob_name}")
+          except Exception as e:
+              print(f"::error::Error descargando modelos: {e}")
+              sys.exit(1)
+          EOF
+
+      - name: Skip if no models available
+        id: check_models
+        run: |
+          if [ -f /tmp/no_models ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Evaluate models against holdout dataset
+        if: steps.check_models.outputs.skip == 'false'
+        env:
+          MLFLOW_TRACKING_URI: ./mlruns
+        run: |
+          cd ai-engine
+          python evaluate.py --model all
+        # evaluate.py retorna exit code 1 si MAE > 5 → el job falla y bloquea el merge
+
+      - name: Post validation summary to PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const conclusion = '${{ job.status }}';
+            const skip = '${{ steps.check_models.outputs.skip }}';
+            let body;
+            if (skip === 'true') {
+              body = '### ML Validation\n⏭️ **Omitida** — no hay artefactos `.pkl` en Azure Blob aún.\nEjecuta el pipeline de entrenamiento antes de hacer merge con cambios en `ai-engine/`.';
+            } else if (conclusion === 'success') {
+              body = '### ML Validation ✅\n**MAE ≤ 5 pasajeros** — los modelos cumplen el umbral de precisión. Aprobado para merge.';
+            } else {
+              body = '### ML Validation ❌\n**MAE > 5 pasajeros** — los modelos degradaron. Revisar `ai-engine/evaluate.py` antes de hacer merge.';
+            }
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });

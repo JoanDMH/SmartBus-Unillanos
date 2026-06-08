@@ -13,6 +13,7 @@ from sqlalchemy import (
     Text,
     select,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -40,6 +41,23 @@ class TripRow(Base):
     notes = Column(Text, nullable=True)
     registered_by = Column(String(100), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
+class ScheduleRow(Base):
+    """Weekly optimization schedule approved for dispatch (DEV-C3)."""
+
+    __tablename__ = "schedules"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    week_label = Column(String(20), nullable=False)          # e.g. "2026-W24"
+    status = Column(String(20), nullable=False, default="pending")  # pending | approved
+    schedule_data = Column(JSONB, nullable=False)             # {day: [{hour, buses, ...}]}
+    total_cost_cop = Column(Integer, nullable=False, default=0)
+    fleet_config = Column(JSONB, nullable=True)               # FleetConfig snapshot
+    generated_by = Column(String(100), nullable=False, default="optimizer")
+    approved_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    approved_at = Column(DateTime(timezone=True), nullable=True)
 
 
 # ── Engine & Session ──────────────────────────────────────────────────
